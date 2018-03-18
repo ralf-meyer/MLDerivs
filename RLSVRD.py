@@ -78,7 +78,15 @@ class RLSVRD(object):
             mat[0, 1:len(x_train) + 1] = 1
             # avoid singular matrix when training with derivatives only
             if len(x_train) == 0:
-                mat[0,0]=1
+                mat[0, 0]=1
+        elif self.method == 2:
+            mat = _np.zeros((1 + len(x_train) + len(x_prime_train)*self.dim,
+                            1 + len(x_train) + len(x_prime_train)*self.dim))
+            mat[0:len(x_train), -1] = 1
+            mat[-1, 0:len(x_train)] = 1
+            # avoid singular matrix when training with derivatives only
+            if len(x_train) == 0:
+                mat[-1, -1]=1
 
         # Populate matrix. Would be significantly simpler under the assumption
         # that x_train == x_prime_train.
@@ -144,6 +152,12 @@ class RLSVRD(object):
             self.a = a_b[1:len(x_train)+1]
             self.b = a_b[len(x_train)+1:].reshape((self.dim, -1)).T
             self.intercept = a_b[0]
+        elif self.method == 2:
+            a_b = matinv.dot(_np.concatenate([y_train] +
+                [y_prime_train[:,i] for i in range(self.dim)] + [_np.zeros(1)]))
+            self.a = a_b[0:len(x_train)]
+            self.b = a_b[len(x_train):-1].reshape((self.dim, -1)).T
+            self.intercept = a_b[-1]
 
         self._is_fitted = True
         if plot_matrices:
@@ -154,7 +168,7 @@ class RLSVRD(object):
         Parameters:
           x: shape (n_samples, n_features)
             Feature vectors on which the model should be evaluated
-        Returns: 
+        Returns:
           y_pred: shape(n_samples,)
             Predictions of the model at the supplied feature vectors
         """
