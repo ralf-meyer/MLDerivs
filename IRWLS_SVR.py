@@ -24,7 +24,7 @@ class IRWLS_SVR():
             y_prime_train = _np.zeros((0, self.dim))
         K = self.kernel(x_train, x_train)
         K_prime = self.kernel(x_prime_train, x_train, dx = -1, dy = 0)
-        G = self.kernel(x_prime_train, x_train, dx = -1, dy = 0).T
+        G = K_prime.T
         J = self.kernel(x_prime_train, x_prime_train, dx = 0, dy = 0)
 
         a = _np.zeros(len(x_train))
