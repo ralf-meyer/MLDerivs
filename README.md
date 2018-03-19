@@ -3,17 +3,17 @@
 Collection of Machine Learning algorithms for learning and predicting functions
 and their Derivatives.
 
-## IRWLS_SVR
+## IRWLS SVR
 
 Implementation of the Iterative Re-Weighted Least Sqaure procedure for
 fitting a Support Vector Regressor.
 
 
 Sources:
+
 [Lazaro et al., 2003](http://ieeexplore.ieee.org/document/1318018/)
 ([pdf](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=1318018))
-[Perez-Cruz et al., 2000]
-(http://ieeexplore.ieee.org/document/7075361/)
+[Perez-Cruz et al., 2000](http://ieeexplore.ieee.org/document/7075361/)
 ([pdf](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7075361)).
 
 
