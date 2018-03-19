@@ -27,6 +27,18 @@ class IRWLS_SVR():
         G = K_prime.T
         J = self.kernel(x_prime_train, x_prime_train, dx = 0, dy = 0)
 
+        # In a first step the full matrix without the diagonal terms D_a+a* is
+        # constructed. This would need to be changed when dealing with large
+        # amounts of data points.
+        full_matrix = _np.zeros((len(x_train) + len(x_prime_train) + 1,
+                                len(x_train) + len(x_prime_train) + 1))
+        full_matrix[:len(x_train), :len(x_train)] = K
+        full_matrix[:len(x_train), len(x_train):-1] = G
+        full_matrix[len(x_train):-1, :len(x_train)] = K_prime
+        full_matrix[len(x_train):-1, len(x_train):-1] = J
+        full_matrix[:len(x_train), -1] = 1.0
+        full_matrix[-1, :len(x_train)] = 1.0
+
         a = _np.zeros(len(x_train))
         a[0::2] = self.C1
         a_star = _np.zeros(len(x_train))
@@ -45,17 +57,26 @@ class IRWLS_SVR():
         converged = False
 
         while not converged:
-            mat = _np.zeros((_np.sum(active_a) + _np.sum(active_s) + 1, _np.sum(active_a) + _np.sum(active_s) + 1))
-            mat[:_np.sum(active_a), :_np.sum(active_a)] = K[_np.logical_and.outer(active_a, active_a)].reshape((_np.sum(active_a),_np.sum(active_a))) + \
-                                                              _np.diag(1.0/(a + a_star)[active_a])
-            mat[:_np.sum(active_a), _np.sum(active_a):-1] = G[_np.logical_and.outer(active_a, active_s)].reshape((_np.sum(active_a), _np.sum(active_s)))
-            mat[_np.sum(active_a):-1, :_np.sum(active_a)] = K_prime[_np.logical_and.outer(active_s, active_a)].reshape((_np.sum(active_s), _np.sum(active_a)))
-            mat[_np.sum(active_a):-1, _np.sum(active_a):-1] = J[_np.logical_and.outer(active_s, active_s)].reshape((_np.sum(active_s),_np.sum(active_s))) + \
-                                                              _np.diag(1.0/(s + s_star)[active_s])
-            mat[-1, :_np.sum(active_a)] = 1.0
-            mat[:_np.sum(active_a), -1] = 1.0
-            target = _np.concatenate([(a - a_star)[active_a]/(a + a_star)[active_a]*self.epsilon + y_train[active_a],
-                                     (s - s_star)[active_s]/(s + s_star)[active_s]*self.epsilon + y_prime_train.flatten()[active_s], _np.zeros(1)])
+            N_a = _np.sum(active_a)
+            N_s = _np.sum(active_s)
+            # Build vector of all active coefficients (a, s and b) for masking
+            active_coeffs = _np.concatenate([active_a, active_s,
+                _np.ones(1, dtype = bool)])
+
+            # Setup reduced matrix
+            mat = full_matrix[_np.logical_and.outer(active_coeffs,
+                active_coeffs)].reshape((N_a + N_s + 1, N_a + N_s + 1))
+            mat[:N_a, :N_a] += _np.diag(1.0/(a + a_star)[active_a])
+            mat[N_a:-1, N_a:-1] +=  _np.diag(1.0/(s + s_star)[active_s])
+            if N_a == 0:
+                mat[-1, -1] = 1.0
+
+            # Setup corresponding target vector
+            target = _np.concatenate([
+                (a - a_star)[active_a]/(a + a_star)[active_a] * self.epsilon +
+                y_train[active_a],
+                (s - s_star)[active_s]/(s + s_star)[active_s]*self.epsilon +
+                y_prime_train[active_s], _np.zeros(1)])
 
             beta_gamma_b = _np.linalg.solve(mat, target)
 
