@@ -29,7 +29,7 @@ class RLSVRD(object):
         self.method = method
         self._is_fitted = False
 
-    def fit(self, x_train, y_train, x_prime_train, y_prime_train,
+    def fit(self, x_train, y_train, x_prime_train = None, y_prime_train = None,
             plot_matrices = False):
         """Fit the model to given training data
         Parameters:
@@ -46,9 +46,13 @@ class RLSVRD(object):
         Returns:
             self
         """
+        self.dim = x_train.shape[1]
+        if x_prime_train is None:
+            x_prime_train = _np.zeros((0, self.dim))
+        if y_prime_train is None:
+            y_prime_train = _np.zeros((0, self.dim))
         self.x_train = x_train
         self.x_prime_train = x_prime_train
-        self.dim = x_train.shape[1]
 
         if self.method == 0:
             mat = _np.zeros((len(x_train) + len(x_prime_train)*self.dim,
