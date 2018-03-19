@@ -11,17 +11,45 @@ class IRWLS_SVR():
     ([pdf](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7075361)).
     """
     def __init__(self, C1 = 1.0, C2 = 1.0, epsilon = 0.1, gamma = 1.0):
+        """Construct a new regressor
+
+        Args:
+          C1: Penalty parameter C of the error term.
+          C2: Penalty parameter of the error in the derivaties.
+          epsilon: insensitive region of the error function.
+          gamma: Factor for the exponential in the RBF kernel. Defaults to 1.0.
+        """
         self.C1 = C1
         self.C2 = C2
         self.epsilon = epsilon
         self.kernel = RBF(gamma = gamma)
+        self._is_fitted = False
 
-    def fit(self, x_train, y_train, x_prime_train = None, y_prime_train = None, max_iter = 1000):
+    def fit(self, x_train, y_train, x_prime_train = None, y_prime_train = None,
+        max_iter = 1000):
+        """Fit the model to given training data
+        Parameters:
+          x_train: shape (n_samples, n_features)
+            Trainings vectors.
+          y_train: shape (n_samples)
+            Values of the target function at the trainings vectors x_train.
+          x_prime_train: shape(n_derivative_samples, n_features)
+            Trainings vectors for the derivatives. Seperate input as the
+            algorithm allows these to be different from x_train.
+          y_prime_train: shape(n_derivative_samples, n_features)
+            Contains the derivatives of the target function at the points
+            x_prime_train with respect to all dimensions (features)
+        Returns:
+            self
+        """
         self.dim = x_train.shape[1]
         if x_prime_train is None:
             x_prime_train = _np.zeros((0, self.dim))
         if y_prime_train is None:
             y_prime_train = _np.zeros((0, self.dim))
+
+        y_prime_train = y_prime_train.flatten()
+
         K = self.kernel(x_train, x_train)
         K_prime = self.kernel(x_prime_train, x_train, dx = -1, dy = 0)
         G = K_prime.T
@@ -50,8 +78,8 @@ class IRWLS_SVR():
 
         beta_gamma = _np.zeros(len(x_train) + len(x_prime_train))
 
-        active_a = _np.ones(len(x_train), dtype=bool)
-        active_s = _np.ones(len(x_prime_train), dtype=bool)
+        active_a = _np.ones(len(x_train), dtype = bool)
+        active_s = _np.ones(len(x_prime_train), dtype = bool)
 
         iter_counter = 0
         converged = False
@@ -80,35 +108,50 @@ class IRWLS_SVR():
 
             beta_gamma_b = _np.linalg.solve(mat, target)
 
-            beta_gamma[_np.concatenate([active_a, active_s])] = beta_gamma_b[:-1]
-            beta_gamma[_np.logical_not(_np.concatenate([active_a, active_s]))] = 0.0
+            beta_gamma[active_coeffs[:-1]] = beta_gamma_b[:-1]
+            beta_gamma[_np.logical_not(active_coeffs[:-1])] = 0.0
             b = beta_gamma_b[-1]
 
-            e = K.dot(beta_gamma[:len(x_train)]) + G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
-            e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
-            d = K_prime.dot(beta_gamma[:len(x_train)]) + J.dot(beta_gamma[len(x_train):]) - y_prime_train.flatten() - self.epsilon
-            d_star = y_prime_train.flatten() - K_prime.dot(beta_gamma[:len(x_train)]) - J.dot(beta_gamma[len(x_train):]) - self.epsilon
+            # Calculate errors
+            e = K.dot(beta_gamma[:len(x_train)]) + \
+                G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
+            e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - \
+                G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
+            d = K_prime.dot(beta_gamma[:len(x_train)]) + \
+                J.dot(beta_gamma[len(x_train):]) - y_prime_train - self.epsilon
+            d_star = y_prime_train - K_prime.dot(beta_gamma[:len(x_train)]) - \
+                J.dot(beta_gamma[len(x_train):]) - self.epsilon
 
-            a = _np.minimum(_np.maximum(0, self.C1/e), 1e6)
-            a_star = _np.minimum(_np.maximum(0, self.C1/e_star), 1e6)
-            s = _np.minimum(_np.maximum(0, self.C2/d), 1e6)
-            s_star = _np.minimum(_np.maximum(0, self.C2/d_star), 1e6)
+            # a and s are restricted by a maximal error
+            a = _np.minimum(_np.maximum(0, self.C1/e), 1e8)
+            a_star = _np.minimum(_np.maximum(0, self.C1/e_star), 1e8)
+            s = _np.minimum(_np.maximum(0, self.C2/d), 1e8)
+            s_star = _np.minimum(_np.maximum(0, self.C2/d_star), 1e8)
 
-            active_a[_np.logical_and(active_a, _np.logical_and(a == 0.0, a_star == 0.0))] = False
-            active_a[_np.logical_and(_np.logical_not(active_a), _np.logical_or(a != 0.0, a_star != 0.0))] = True
-            active_s[_np.logical_and(active_s, _np.logical_and(s == 0.0, s_star == 0.0))] = False
-            active_s[_np.logical_and(_np.logical_not(active_s), _np.logical_or(s != 0.0, s_star != 0.0))] = True
+            # Calculate active coefficients for next step
+            active_a[_np.logical_and(active_a,
+                _np.logical_and(a == 0.0, a_star == 0.0))] = False
+            active_a[_np.logical_and(_np.logical_not(active_a),
+                _np.logical_or(a != 0.0, a_star != 0.0))] = True
+            active_s[_np.logical_and(active_s,
+                _np.logical_and(s == 0.0, s_star == 0.0))] = False
+            active_s[_np.logical_and(_np.logical_not(active_s),
+                _np.logical_or(s != 0.0, s_star != 0.0))] = True
 
+            # Check for convergence
             if iter_counter > 0:
-                if _np.linalg.norm(beta_gamma - beta_gamma_old) < 1e-10 and _np.abs(b - b_old) < 1e-10:
+                if (_np.linalg.norm(beta_gamma - beta_gamma_old) < 1e-10 and
+                    _np.abs(b - b_old) < 1e-10):
                     print("Converged after {} iterations".format(iter_counter))
                     converged = True
 
             if iter_counter >= max_iter:
                 print("Maximum iterations ({}) reached!".format(max_iter))
-                print("Final Deltas: beta_gammma: {: 14.12f}, b: {: 14.12f}".format(_np.linalg.norm(beta_gamma - beta_gamma_old), _np.abs(b - b_old)))
+                print("Final Deltas: beta_gammma: {: 14.12f}, b: {: 14.12f}".format(
+                    _np.linalg.norm(beta_gamma - beta_gamma_old), _np.abs(b - b_old)))
                 converged = True
 
+            # Save old values for convergence testing
             beta_gamma_old = beta_gamma.copy()
             b_old = b.copy()
             iter_counter += 1
@@ -118,10 +161,36 @@ class IRWLS_SVR():
         self.beta_gamma = beta_gamma[_np.concatenate([active_a, active_s])]
         self.intercept = b
 
+        self._is_fitted = True
+
     def predict(self, x_test):
-        return self.kernel(x_test, self.x_train).dot(self.beta_gamma[:len(self.x_train)]) + \
-               self.kernel(x_test, self.x_prime_train, dx = 0, dy = -1).dot(self.beta_gamma[len(self.x_train):]) + self.intercept
+        """Predict the values of a fitted model for new feature vectors
+        Parameters:
+          x: shape (n_samples, n_features)
+            Feature vectors on which the model should be evaluated
+        Returns:
+          y_pred: shape(n_samples,)
+            Predictions of the model at the supplied feature vectors
+        """
+        if not self._is_fitted:
+            raise ValueError("Instance is not fitted yet")
+        return self.kernel(x_test, self.x_train).dot(
+            self.beta_gamma[:len(self.x_train)]) + \
+            self.kernel(x_test, self.x_prime_train, dx = 0, dy = -1).dot(
+            self.beta_gamma[len(self.x_train):]) + self.intercept
 
     def predict_derivative(self, x_test):
-        return self.kernel(x_test, self.x_train, dx = -1, dy = 0).dot(self.beta_gamma[:len(self.x_train)]) + \
-               self.kernel(x_test, self.x_prime_train, dx = 0, dy = 0).dot(self.beta_gamma[len(self.x_train):])
+        """Predict the derivatives of a fitted model for new feature vectors
+        Parameters:
+          x: shape (n_samples, n_features)
+            Feature vectors on which the model derivatives should be evaluated
+        Returns:
+          y_pred: shape(n_samples, n_features)
+            Predictions of the model derivatives at the supplied feature vectors
+        """
+        if not self._is_fitted:
+            raise ValueError("Instance is not fitted yet")
+        return self.kernel(x_test, self.x_train, dx = -1, dy = 0).dot(
+            self.beta_gamma[:len(self.x_train)]) + \
+            self.kernel(x_test, self.x_prime_train, dx = 0, dy = 0).dot(
+            self.beta_gamma[len(self.x_train):])
