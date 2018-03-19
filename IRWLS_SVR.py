@@ -45,8 +45,8 @@ class IRWLS_SVR():
 
             gamma_b = _np.linalg.solve(mat, target)
 
-            gamma[S_indices == 1] = gamma_b[:-1]
-            gamma[S_indices == 2] = 0.0
+            gamma[S_ind == 1] = gamma_b[:-1]
+            gamma[S_ind == 2] = 0.0
             b = gamma_b[-1]
 
             # Variation from paper: flipped sign for epsilon
@@ -61,19 +61,19 @@ class IRWLS_SVR():
             a_star = _np.minimum(_np.maximum(0, self.C/e_star), 1e6)
 
             # Reorder samples
-            S_indices[_np.logical_and(S_indices == 3,
+            S_ind[_np.logical_and(S_ind == 3,
                 _np.logical_and(e < 0.0, e_star < 0.0))] = 2
-            S_indices[_np.logical_and(S_indices == 1,
+            S_ind[_np.logical_and(S_ind == 1,
                 _np.abs(gamma) == self.C)] = 3
-            S_indices[_np.logical_and(S_indices == 1,
+            S_ind[_np.logical_and(S_ind == 1,
                 _np.logical_and(a == 0.0, a_star == 0.0))] = 2
-            S_indices[_np.logical_and(S_indices == 2,
+            S_ind[_np.logical_and(S_ind == 2,
                 _np.logical_or(a != 0.0, a_star != 0.0))] = 1
 
-            G13 = H[_np.logical_and.outer(S_indices == 1, S_indices == 3)].reshape((num_S1, _np.sum(S_indices == 3))).dot(gamma[S_indices == 3])
+            G13 = H[_np.logical_and.outer(S_ind == 1, S_ind == 3)].reshape((num_S1, _np.sum(S_ind == 3))).dot(gamma[S_ind == 3])
             if any(G13 != 0.0):
                 print G13
-            Gb = -_np.sum(gamma[S_indices == 3], keepdims = True)
+            Gb = -_np.sum(gamma[S_ind == 3], keepdims = True)
 
             if iter_counter > 0:
                 if _np.linalg.norm(gamma - gamma_old) < 1e-10 and _np.abs(b - b_old) < 1e-10:
@@ -90,8 +90,8 @@ class IRWLS_SVR():
             b_old = b.copy()
             iter_counter += 1
 
-        self.x_train = x_train[S_indices == 1]
-        self.gamma = gamma[S_indices == 1]
+        self.x_train = x_train[S_ind == 1]
+        self.gamma = gamma[S_ind == 1]
         self.intercept = b
         plt.semilogy(L)
 
