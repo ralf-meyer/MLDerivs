@@ -1,23 +1,5 @@
 import numpy as _np
-
-def RBF_Kernel(x, y, nx = -1, ny = -1, gamma = 1.0):
-    exp_mat = _np.exp(-gamma * (_np.tile(_np.sum(x**2, axis = 1), (len(y), 1)).T +
-        _np.tile(_np.sum(y**2, axis = 1), (len(x), 1)) - 2*x.dot(y.T)))
-    if nx == ny:
-        if nx == -1:
-            return exp_mat
-        else:
-            return -2.0 * gamma * exp_mat * \
-                (2.0 * gamma * _np.subtract.outer(x[:,ny].T, y[:,ny])**2 - 1)
-    elif nx == -1:
-        return -2.0 * gamma * exp_mat * _np.subtract.outer(x[:,ny].T, y[:,ny])
-    elif ny == -1:
-        return 2.0 * gamma * exp_mat * _np.subtract.outer(x[:,nx].T, y[:,nx])
-    else:
-        return -4.0 * gamma**2 * exp_mat * \
-            _np.subtract.outer(x[:,nx].T, y[:,nx]) * \
-            _np.subtract.outer(x[:,ny].T, y[:,ny])
-
+from kernels import RBF
 
 class RLSVRD(object):
     """Implementation of the regularized least squares support vector
@@ -43,7 +25,7 @@ class RLSVRD(object):
         """
         self.C1 = C1
         self.C2 = C2
-        self.gamma = gamma
+        self.kernel = RBF(gamma = gamma)
         self.method = method
         self._is_fitted = False
 
@@ -86,56 +68,53 @@ class RLSVRD(object):
             mat[-1, 0:len(x_train)] = 1
             # avoid singular matrix when training with derivatives only
             if len(x_train) == 0:
-                mat[-1, -1]=1
+                mat[-1, -1] = 1
 
         # Populate matrix. Would be significantly simpler under the assumption
         # that x_train == x_prime_train.
-        for nx in range(-1, self.dim):
-            for ny in range(nx, self.dim):
+        for dx in range(-1, self.dim):
+            for dy in range(dx, self.dim):
                 # find pairs of indices determining the position of certain
                 # blocks within the matrix
-                if nx == -1 and ny == -1:
+                if dx == -1 and dy == -1:
                     ind1 = [0, len(x_train)]
                     ind2 = [0, len(x_train)]
-                elif nx == -1:
-                    ind1 = [len(x_train) + (ny)*len(x_prime_train),
-                            len(x_train) + (ny + 1)*len(x_prime_train)]
+                elif dx == -1:
+                    ind1 = [len(x_train) + (dy)*len(x_prime_train),
+                            len(x_train) + (dy + 1)*len(x_prime_train)]
                     ind2 = [0, len(x_train)]
-                elif ny == -1:
+                elif dy == -1:
                     ind1 = [0, len(x_train)]
-                    ind2 = [len(x_train) + (nx)*len(x_prime_train),
-                            len(x_train) + (nx + 1)*len(x_prime_train)]
+                    ind2 = [len(x_train) + (dx)*len(x_prime_train),
+                            len(x_train) + (dx + 1)*len(x_prime_train)]
                 else:
-                    ind1 = [len(x_train) + (ny)*len(x_prime_train),
-                            len(x_train) + (ny + 1)*len(x_prime_train)]
-                    ind2 = [len(x_train) + (nx)*len(x_prime_train),
-                            len(x_train) + (nx + 1)*len(x_prime_train)]
+                    ind1 = [len(x_train) + (dy)*len(x_prime_train),
+                            len(x_train) + (dy + 1)*len(x_prime_train)]
+                    ind2 = [len(x_train) + (dx)*len(x_prime_train),
+                            len(x_train) + (dx + 1)*len(x_prime_train)]
                 if self.method == 1:
                     ind1 = [i + 1 for i in ind1]
                     ind2 = [i + 1 for i in ind2]
 
-                if nx == ny:
-                    if nx == -1:
+                if dx == dy:
+                    if dx == -1:
                         if self.method == 0:
-                            mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = RBF_Kernel(
-                                x_train, x_train, gamma = self.gamma, nx = nx,
-                                ny = ny) + 1 + _np.eye(len(x_train))/self.C1
+                            mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = self.kernel(
+                                x_train, x_train, dx = dx, dy = dy) + 1 + \
+                                _np.eye(len(x_train))/self.C1
                         else:
-                            mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = RBF_Kernel(
-                                x_train, x_train, gamma = self.gamma, nx = nx,
-                                ny = ny) + _np.eye(len(x_train))/self.C1
+                            mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = self.kernel(
+                                x_train, x_train, dx = dx, dy = dy) + \
+                                _np.eye(len(x_train))/self.C1
                     else:
-                        mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = RBF_Kernel(
-                            x_prime_train, x_prime_train, gamma = self.gamma,
-                            nx = nx, ny = ny) + \
+                        mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = self.kernel(
+                            x_prime_train, x_prime_train, dx = dx, dy = dy) + \
                             _np.eye(len(x_prime_train))/self.C2
                 else:
-                    mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = RBF_Kernel(
-                        x_prime_train, x_train, gamma = self.gamma, nx = nx,
-                        ny = ny)
-                    mat[ind2[0]:ind2[1], ind1[0]:ind1[1]] = RBF_Kernel(
-                        x_prime_train, x_train, gamma = self.gamma, nx = nx,
-                        ny = ny).T
+                    mat[ind1[0]:ind1[1], ind2[0]:ind2[1]] = self.kernel(
+                        x_prime_train, x_train, dx = dx, dy = dy)
+                    mat[ind2[0]:ind2[1], ind1[0]:ind1[1]] = self.kernel(
+                        x_prime_train, x_train, dx = dx, dy = dy).T
 
         # ToDo: Implement partition scheme for inverting the matrix
         matinv = _np.linalg.inv(mat)
@@ -174,9 +153,8 @@ class RLSVRD(object):
         """
         if not self._is_fitted:
             raise ValueError("Instance is not fitted yet")
-        return self.a.dot(RBF_Kernel(self.x_train, x, gamma = self.gamma)) + \
-            sum([ self.b[:,i].dot(RBF_Kernel(
-            self.x_prime_train, x, gamma = self.gamma, ny = i))
+        return self.a.dot(self.kernel(self.x_train, x)) + \
+            sum([ self.b[:,i].dot(self.kernel(self.x_prime_train, x, dy = i))
             for i in range(self.dim)]) + self.intercept
 
     def predict_derivative(self, x):
@@ -190,10 +168,9 @@ class RLSVRD(object):
         """
         ret_mat = _np.zeros((len(x), self.dim))
         for i in range(self.dim):
-            ret_mat[:,i] = self.a.dot(RBF_Kernel(
-                self.x_train, x, gamma = self.gamma, nx = i)) + \
-                sum([self.b[:,j].dot(RBF_Kernel(
-                self.x_prime_train, x, gamma = self.gamma, nx = i, ny = j))
+            ret_mat[:,i] = self.a.dot(self.kernel(
+                self.x_train, x, dx = i)) + sum([self.b[:,j].dot(self.kernel(
+                self.x_prime_train, x, dx = i, dy = j))
                 for j in range(self.dim)])
         if not self._is_fitted:
             raise ValueError("Instance is not fitted yet")
