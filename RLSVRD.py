@@ -121,22 +121,23 @@ class RLSVRD(object):
                         x_prime_train, x_train, dx = dx, dy = dy).T
 
         # ToDo: Implement partition scheme for inverting the matrix
-        matinv = _np.linalg.inv(mat)
+        # For now numpy.linalg.solve is used
+        #matinv = _np.linalg.inv(mat)
 
         if self.method == 0:
-            a_b = matinv.dot(_np.concatenate(
+            a_b = _np.linalg.solve(mat, _np.concatenate(
                 [y_train] + [y_prime_train[:,i] for i in range(self.dim)]))
             self.a = a_b[0:len(x_train)]
             self.b = a_b[len(x_train):].reshape((self.dim, -1)).T
             self.intercept = sum(self.a)
         elif self.method == 1:
-            a_b = matinv.dot(_np.concatenate([_np.zeros(1), y_train] +
-                [y_prime_train[:,i] for i in range(self.dim)]))
+            a_b = _np.linalg.solve(mat, _np.concatenate([_np.zeros(1),
+                y_train] + [y_prime_train[:,i] for i in range(self.dim)]))
             self.a = a_b[1:len(x_train)+1]
             self.b = a_b[len(x_train)+1:].reshape((self.dim, -1)).T
             self.intercept = a_b[0]
         elif self.method == 2:
-            a_b = matinv.dot(_np.concatenate([y_train] +
+            a_b = _np.linalg.solve(mat, _np.concatenate([y_train] +
                 [y_prime_train[:,i] for i in range(self.dim)] + [_np.zeros(1)]))
             self.a = a_b[0:len(x_train)]
             self.b = a_b[len(x_train):-1].reshape((self.dim, -1)).T
@@ -144,7 +145,7 @@ class RLSVRD(object):
 
         self._is_fitted = True
         if plot_matrices:
-            self._plot_matrices(mat, matinv)
+            self._plot_matrices(mat)
 
     def predict(self, x):
         """Predict the values of a fitted model for new feature vectors
@@ -180,13 +181,13 @@ class RLSVRD(object):
             raise ValueError("Instance is not fitted yet")
         return ret_mat
 
-    def _plot_matrices(self, mat, matinv):
+    def _plot_matrices(self, mat):
         """ Used for debugging"""
         import matplotlib.pyplot as _plt
         fig, (ax0, ax1) = _plt.subplots(ncols=2, figsize = (12,5))
         p0 = ax0.pcolormesh(mat)
         ax0.set_ylim(len(mat),0)
         fig.colorbar(p0, ax = ax0)
-        p1 = ax1.pcolormesh(matinv)
+        p1 = ax1.pcolormesh(np.linalg.inv(mat))
         ax1.set_ylim(len(mat),0)
         fig.colorbar(p1, ax = ax1)
