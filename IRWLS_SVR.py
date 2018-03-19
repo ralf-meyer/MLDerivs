@@ -6,7 +6,7 @@ class IRWLS_SVR():
     fitting a Support Vector Regressor.
 
 
-    See [Pérez-Cruz et al., 2000]
+    See [Perez-Cruz et al., 2000]
     (http://ieeexplore.ieee.org/document/7075361/)
     ([pdf](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7075361)).
     """
