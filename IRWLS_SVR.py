@@ -54,7 +54,6 @@ class IRWLS_SVR():
                                                               _np.diag(1.0/(s + s_star)[active_s])
             mat[-1, :_np.sum(active_a)] = 1.0
             mat[:_np.sum(active_a), -1] = 1.0
-            # Variation from paper: target vector contains +y_train instead of -y_train
             target = _np.concatenate([(a - a_star)[active_a]/(a + a_star)[active_a]*self.epsilon + y_train[active_a],
                                      (s - s_star)[active_s]/(s + s_star)[active_s]*self.epsilon + y_prime_train.flatten()[active_s], _np.zeros(1)])
 
@@ -64,15 +63,11 @@ class IRWLS_SVR():
             beta_gamma[_np.logical_not(_np.concatenate([active_a, active_s]))] = 0.0
             b = beta_gamma_b[-1]
 
-            # Had to be fixed from wrong definition in paper
-            #e = self.epsilon - y_train + H.dot(gamma) + b
-            #e_star = self.epsilon + y_train - H.dot(gamma) - b
             e = K.dot(beta_gamma[:len(x_train)]) + G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
             e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
             d = K_prime.dot(beta_gamma[:len(x_train)]) + J.dot(beta_gamma[len(x_train):]) - y_prime_train.flatten() - self.epsilon
             d_star = y_prime_train.flatten() - K_prime.dot(beta_gamma[:len(x_train)]) - J.dot(beta_gamma[len(x_train):]) - self.epsilon
 
-            # Variation from paper: dropping factor 2
             a = _np.minimum(_np.maximum(0, self.C1/e), 1e6)
             a_star = _np.minimum(_np.maximum(0, self.C1/e_star), 1e6)
             s = _np.minimum(_np.maximum(0, self.C2/d), 1e6)
