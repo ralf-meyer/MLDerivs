@@ -51,6 +51,7 @@ class RLSVRD(object):
             x_prime_train = _np.zeros((0, self.dim))
         if y_prime_train is None:
             y_prime_train = _np.zeros((0, self.dim))
+
         self.x_train = x_train
         self.x_prime_train = x_prime_train
 
@@ -171,14 +172,14 @@ class RLSVRD(object):
           y_pred: shape(n_samples, n_features)
             Predictions of the model derivatives at the supplied feature vectors
         """
+        if not self._is_fitted:
+            raise ValueError("Instance is not fitted yet")
         ret_mat = _np.zeros((len(x), self.dim))
         for i in range(self.dim):
             ret_mat[:,i] = self.a.dot(self.kernel(
                 self.x_train, x, dx = i)) + sum([self.b[:,j].dot(self.kernel(
                 self.x_prime_train, x, dx = i, dy = j))
                 for j in range(self.dim)])
-        if not self._is_fitted:
-            raise ValueError("Instance is not fitted yet")
         return ret_mat
 
     def _plot_matrices(self, mat):
