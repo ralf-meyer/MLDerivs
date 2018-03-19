@@ -78,7 +78,7 @@ class RLSVRD(object):
             mat[0, 1:len(x_train) + 1] = 1
             # avoid singular matrix when training with derivatives only
             if len(x_train) == 0:
-                mat[0, 0]=1
+                mat[-1, -1] = 1
         elif self.method == 2:
             mat = _np.zeros((1 + len(x_train) + len(x_prime_train)*self.dim,
                             1 + len(x_train) + len(x_prime_train)*self.dim))
