@@ -11,7 +11,7 @@ class IRWLS_SVR():
     ([pdf](http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7075361)).
     """
 
-    def __init__(self, C = 1, epsilon = 0.1, gamma = 1.0):
+    def __init__(self, C = 1.0, epsilon = 0.1, gamma = 1.0):
         self.C = C
         self.epsilon = epsilon
         self.kernel = RBF(gamma = gamma)
@@ -30,7 +30,7 @@ class IRWLS_SVR():
 
         iter_counter = 0
         converged = False
-        L = []
+        self.L = []
 
         while not converged:
             num_S1 = _np.sum(S_ind == 1)
@@ -54,7 +54,7 @@ class IRWLS_SVR():
             e_star = y_train - H.dot(gamma) - b - self.epsilon
 
             # Calculate Lagrange at this point:
-            L.append(0.5 * gamma.T.dot(H).dot(gamma) - (a.dot(e**2) + a_star.dot(e_star**2)))
+            self.L.append(0.5 * gamma.T.dot(H).dot(gamma) - (a.dot(e**2) + a_star.dot(e_star**2)))
 
             # Variation from paper: dropping factor 2
             a = _np.minimum(_np.maximum(0, self.C/e), 1e6)
@@ -70,7 +70,7 @@ class IRWLS_SVR():
             S_ind[_np.logical_and(S_ind == 2,
                 _np.logical_or(a != 0.0, a_star != 0.0))] = 1
 
-            G13 = H[_np.logical_and.outer(S_ind == 1, S_ind == 3)].reshape((num_S1, _np.sum(S_ind == 3))).dot(gamma[S_ind == 3])
+            G13 = H[_np.logical_and.outer(S_ind == 1, S_ind == 3)].reshape((_np.sum(S_ind == 1), _np.sum(S_ind == 3))).dot(gamma[S_ind == 3])
             if any(G13 != 0.0):
                 print G13
             Gb = -_np.sum(gamma[S_ind == 3], keepdims = True)
@@ -93,7 +93,6 @@ class IRWLS_SVR():
         self.x_train = x_train[S_ind == 1]
         self.gamma = gamma[S_ind == 1]
         self.intercept = b
-        plt.semilogy(L)
 
     def predict(self, x_test):
         return self.kernel(x_test, self.x_train).dot(self.gamma) + self.intercept
