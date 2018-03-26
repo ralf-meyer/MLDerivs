@@ -1,7 +1,7 @@
 # MLDerivs
 
-Collection of Machine Learning algorithms for learning and predicting functions
-and their Derivatives.
+Collection of machine learning algorithms for learning and predicting functions
+and their derivatives.
 
 ## IRWLS SVR
 
@@ -20,7 +20,7 @@ Sources:
 ## RLSVRD
 
 Python implementation of the regularized least squares support vector
-regression algorithm for the simulatneous learning of a function and
+regression algorithm for the simultaneous learning of a function and
 its derivatives using the RBF Kernel.
 
 Sources:  
