@@ -65,7 +65,7 @@ class RLSVRD(object):
             mat[0, 1:len(x_train) + 1] = 1
             # avoid singular matrix when training with derivatives only
             if len(x_train) == 0:
-                mat[-1, -1] = 1
+                mat[0, 0] = 1
         elif self.method == 2:
             mat = _np.zeros((1 + len(x_train) + len(x_prime_train)*self.dim,
                             1 + len(x_train) + len(x_prime_train)*self.dim))
@@ -189,6 +189,6 @@ class RLSVRD(object):
         p0 = ax0.pcolormesh(mat)
         ax0.set_ylim(len(mat),0)
         fig.colorbar(p0, ax = ax0)
-        p1 = ax1.pcolormesh(np.linalg.inv(mat))
+        p1 = ax1.pcolormesh(_np.linalg.inv(mat))
         ax1.set_ylim(len(mat),0)
         fig.colorbar(p1, ax = ax1)
