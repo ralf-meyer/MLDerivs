@@ -25,8 +25,12 @@ class IRWLS_SVR():
         self.kernel = RBF(gamma = gamma)
         self._is_fitted = False
 
+    def _lagrange(self, w2, e, e_star, d, d_star):
+        return 0.5*w2 + self.C1*_np.sum(_np.maximum(0, e) + _np.maximum(0, e_star)) +\
+            self.C2*_np.sum(_np.maximum(0, d) + _np.maximum(0, d_star))
+
     def fit(self, x_train, y_train, x_prime_train = None, y_prime_train = None,
-        max_iter = 1000):
+        max_iter = 1000, plot_matrices = False):
         """Fit the model to given training data
         Parameters:
           x_train: shape (n_samples, n_features)
@@ -76,6 +80,7 @@ class IRWLS_SVR():
         s_star = _np.zeros(len(x_prime_train))
         s_star[1::2] = self.C2
 
+        beta_gamma_s = _np.zeros(len(x_train) + len(x_prime_train))
         beta_gamma = _np.zeros(len(x_train) + len(x_prime_train))
 
         active_a = _np.ones(len(x_train), dtype = bool)
@@ -83,8 +88,11 @@ class IRWLS_SVR():
 
         iter_counter = 0
         converged = False
+        self.Ls = []
+        self.coeffs = []
 
         while not converged:
+            eta = 1.0
             N_a = _np.sum(active_a)
             N_s = _np.sum(active_s)
             # Build vector of all active coefficients (a, s and b) for masking
@@ -99,6 +107,12 @@ class IRWLS_SVR():
             if N_a == 0:
                 mat[-1, -1] = 1.0
 
+            if plot_matrices:
+                import matplotlib.pyplot as _plt
+                _plt.figure()
+                _plt.pcolormesh(mat)
+                _plt.colorbar()
+                _plt.ylim(len(mat),0)
             # Setup corresponding target vector
             target = _np.concatenate([
                 (a - a_star)[active_a]/(a + a_star)[active_a] * self.epsilon +
@@ -107,20 +121,43 @@ class IRWLS_SVR():
                 y_prime_train[active_s], _np.zeros(1)])
 
             beta_gamma_b = _np.linalg.solve(mat, target)
+            beta_gamma_s[active_coeffs[:-1]] = beta_gamma_b[:-1]
+            beta_gamma_s[_np.logical_not(active_coeffs[:-1])] = 0.0
+            b_s = beta_gamma_b[-1]
 
-            beta_gamma[active_coeffs[:-1]] = beta_gamma_b[:-1]
-            beta_gamma[_np.logical_not(active_coeffs[:-1])] = 0.0
-            b = beta_gamma_b[-1]
 
-            # Calculate errors
-            e = K.dot(beta_gamma[:len(x_train)]) + \
-                G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
-            e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - \
-                G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
-            d = K_prime.dot(beta_gamma[:len(x_train)]) + \
-                J.dot(beta_gamma[len(x_train):]) - y_prime_train - self.epsilon
-            d_star = y_prime_train - K_prime.dot(beta_gamma[:len(x_train)]) - \
-                J.dot(beta_gamma[len(x_train):]) - self.epsilon
+            if iter_counter > 0:
+                while True:
+                    beta_gamma = beta_gamma_old.copy() + eta*(beta_gamma_s.copy() - beta_gamma_old.copy())
+                    b = b_old.copy() + eta*(b_s.copy() - b_old.copy())
+                    # Calculate errors
+                    e = K.dot(beta_gamma[:len(x_train)]) + \
+                        G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
+                    e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - \
+                        G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
+                    d = K_prime.dot(beta_gamma[:len(x_train)]) + \
+                        J.dot(beta_gamma[len(x_train):]) - y_prime_train - self.epsilon
+                    d_star = y_prime_train - K_prime.dot(beta_gamma[:len(x_train)]) - \
+                        J.dot(beta_gamma[len(x_train):]) - self.epsilon
+                    if self._lagrange(beta_gamma.T.dot(full_matrix[:-1, :-1]).dot(beta_gamma),
+                        e, e_star, d, d_star) > self.Ls[-1]:
+                        eta = eta*0.9
+                    else:
+                        print("Inner Loop converged with eta = {}".format(eta))
+                        break
+
+            else:
+                beta_gamma = beta_gamma_s.copy()
+                b = b_s.copy()
+                # Calculate errors
+                e = K.dot(beta_gamma[:len(x_train)]) + \
+                    G.dot(beta_gamma[len(x_train):]) + b - y_train - self.epsilon
+                e_star = y_train - K.dot(beta_gamma[:len(x_train)]) - \
+                    G.dot(beta_gamma[len(x_train):]) - b - self.epsilon
+                d = K_prime.dot(beta_gamma[:len(x_train)]) + \
+                    J.dot(beta_gamma[len(x_train):]) - y_prime_train - self.epsilon
+                d_star = y_prime_train - K_prime.dot(beta_gamma[:len(x_train)]) - \
+                    J.dot(beta_gamma[len(x_train):]) - self.epsilon
 
             # a and s are restricted by a maximal error
             a = _np.minimum(_np.maximum(0, self.C1/e), 1e8)
@@ -138,6 +175,10 @@ class IRWLS_SVR():
             active_s[_np.logical_and(_np.logical_not(active_s),
                 _np.logical_or(s != 0.0, s_star != 0.0))] = True
 
+            self.Ls.append(self._lagrange(beta_gamma.T.dot(full_matrix[:-1, :-1]).dot(beta_gamma),
+                e, e_star, d, d_star))
+            self.coeffs.append(beta_gamma)    
+
             # Check for convergence
             if iter_counter > 0:
                 if (_np.linalg.norm(beta_gamma - beta_gamma_old) < 1e-10 and
@@ -147,8 +188,9 @@ class IRWLS_SVR():
 
             if iter_counter >= max_iter:
                 print("Maximum iterations ({}) reached!".format(max_iter))
-                print("Final Deltas: beta_gammma: {: 14.12f}, b: {: 14.12f}".format(
-                    _np.linalg.norm(beta_gamma - beta_gamma_old), _np.abs(b - b_old)))
+                if iter_counter > 0:
+                    print("Final Deltas: beta_gammma: {: 14.12f}, b: {: 14.12f}".format(
+                        _np.linalg.norm(beta_gamma - beta_gamma_old), _np.abs(b - b_old)))
                 converged = True
 
             # Save old values for convergence testing
