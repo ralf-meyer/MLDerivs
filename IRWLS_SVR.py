@@ -143,7 +143,9 @@ class IRWLS_SVR():
                         e, e_star, d, d_star) > self.Ls[-1]:
                         eta = eta*0.9
                     else:
-                        print("Inner Loop converged with eta = {}".format(eta))
+                        # Was used for debugging, not sure if it can be remove
+                        # so commented for now:
+                        # print("Inner Loop converged with eta = {}".format(eta))
                         break
 
             else:
