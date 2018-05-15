@@ -21,7 +21,10 @@ class RLSVRD(object):
           gamma: Factor for the exponential in the RBF kernel. Defaults to 1.0.
           method: Determines whether the intercept should be part of the
             regularization (as in the original publication) (method = 0) or
-            not (method = 1). Defaults to 1.
+            not (method = 1). Method = 2 works just as method 1 but uses the
+            last column and row for the calculation of the bias instead of the 
+            first (will be removed or made default in a future version). 
+            Defaults to 1.
         """
         self.C1 = C1
         self.C2 = C2
